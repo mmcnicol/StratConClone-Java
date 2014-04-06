@@ -12,7 +12,6 @@ import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.FileHandler;
 
-
 /**
  *
  * @author matthew
@@ -21,7 +20,7 @@ public class GameEngine {
 
     public enum GameState {
 
-        INIT, USERDIALOGUE, INPROGRESS, ENDED
+        INIT, WAITINGFORUSER, INPROGRESS, ENDED
     }
     private GameState gameState;
     private int dayNumber;
@@ -35,7 +34,7 @@ public class GameEngine {
     private final static Logger logger = Logger.getLogger(GameEngine.class.getName());
     //private boolean idle;
     //private int command; // human player command e.g. (1) wake or (2) move stack
-    GUI gui;
+    private GUI gui;
 
     //getters & setters
     public GameState getGameState() {
@@ -43,6 +42,7 @@ public class GameEngine {
     }
 
     public void setGameState(GameState gameState) {
+        System.out.println("game state = " + gameState);
         this.gameState = gameState;
     }
 
@@ -97,29 +97,26 @@ public class GameEngine {
     public boolean getIsVisiblePlayer1() {
         return player1.getIsVisible();
     }
-    
+
     public boolean getIsVisiblePlayer2() {
         return player2.getIsVisible();
     }
-    
+
     public void setGui(GUI _gui) {
         gui = _gui;
-    }    
+    }
 
     public void init(int dayNumber, int playerId) throws java.io.IOException {
 
-        logger.addHandler(new ConsoleHandler());
+        //logger.addHandler(new ConsoleHandler());
 //        try {
 //            FileHandler handler = new FileHandler("myapp-log.%u.%g.txt", true);
 //        } catch (java.io.IOException ex) {
 //            throw ex;
 //        }
-
         //logger.setLevel(Level.INFO);
-        logger.setLevel(Level.ALL);
-
-        logger.entering(getClass().getName(), "init");
-
+        //logger.setLevel(Level.ALL);
+        //logger.entering(getClass().getName(), "init");
         setGameState(GameState.INIT);
         setDayNumber(dayNumber);
         setCurrentPlayerId(playerId);
@@ -137,61 +134,52 @@ public class GameEngine {
         player2 = new Player();
         player2.setPlayerId(2);
         player2.setIsAI(true); // if Player2 is HUMAN set this to false
-        player2.setIsVisible(true); 
+        player2.setIsVisible(true);
 
 //        //grid = new Grid();
 //        grid.init();
-
-        
-
         //grid.display();
         //IslandList.display();
-        
-        
-
         setGameState(GameState.INPROGRESS);
 
-        logger.exiting(getClass().getName(), "init");
+        //logger.exiting(getClass().getName(), "init");
     }
 
     public boolean assignPlayerStartCity(int playerId, Grid grid) {
 
         boolean isPortCity = false;
-        
+
         System.out.println("in assignPlayerStartCity(" + playerId + ")");
-        
+
         try {
             // identify city at random
             //Cell cell = CityList.getRandomEmpty();
             City city = CityList.getRandomEmpty();
 
             city.setPlayerId(playerId);
-            
+
             System.out.println("city at (" + city.getRow() + ", " + city.getCol() + ")");
 
             isPortCity = city.isPort(grid);
-            
+
             // clear fog of war for player
             grid.clearFogOfWar(playerId, city.getRow(), city.getCol());
 
             // set city production (if player is HUMAN they should be prompted. If player is computer use AI)
             switch (playerId) {
                 case 1:
-                    if (player1.getIsAI()) {
-                        city.setNextUnitProductionAI();
-                    } else {
-                        setGameState(GameState.USERDIALOGUE);
-                        // TODO
-                        //prompt HUMAN player to set initial production unit type
-                    }
+                    // this assumes player1 is always AI 
+                    city.setNextUnitProductionAI();
                     break;
                 case 2:
                     if (player2.getIsAI()) {
                         city.setNextUnitProductionAI();
                     } else {
-                        setGameState(GameState.USERDIALOGUE);
-                        // TODO
-                        //prompt HUMAN player to set initial production unit type
+                        //System.out.println("in ge assignPlayerStartCity about to show select city production dialogue");
+                        // prompt HUMAN player to set initial production unit type
+                        //setGameState(GameState.WAITINGFORUSER);
+                        //gui.buildDialogueCityProduction(isPortCity);
+                        //gui.showDialogueCityProduction();
                     }
                     break;
             }
@@ -199,7 +187,7 @@ public class GameEngine {
         } catch (Exception ex) {
             exit(-1);
         }
-        
+
         return isPortCity;
     }
 
@@ -306,102 +294,114 @@ public class GameEngine {
         //oUnitRef[8] = new UnitRef(8, "Artillery", 4, 1, 4, true, true, false, 1, -1);
         //unitRef[9] = new UnitRef(9, "Helicopter", 8, 1, 1, false, true, true, 10, 10);
     }
-    
-    
-    void doPlayerMove(Grid grid) {
 
-        logger.entering(getClass().getName(), "doPlayerMove");
+    public void doPlayerMove(Grid grid) {
 
-        if (getGameState() == GameState.INPROGRESS) {
-
-            if (getCurrentlyProcessingPlayerTurn() == false) {
-
-                setCurrentlyProcessingPlayerTurn(true);
-
-                // player1 moves first
-                if (UnitList.hasUnitsWithMovesLeftToday(1)) {
-
-                    logger.fine("GameEngine.doPlayerMove() player1 has units with moves left today");
-                    setCurrentPlayerId(1);
-
-                    int unitListId = UnitList.getNextUnitWithMovesLeftToday(1);
-                    setSelectedUnitListId(unitListId);
-                    UnitList.highlight(unitListId);
-
-                    if (player1.getIsAI()) {
-                        UnitList.moveAI(unitListId, grid);
-                    }
-
-                } else if (UnitList.hasUnitsWithMovesLeftToday(2)) {
-
-                    logger.fine("GameEngine.doPlayerMove() player2 has units with moves left today");
-                    setCurrentPlayerId(2);
-
-                    int unitListId = UnitList.getNextUnitWithMovesLeftToday(2);
-                    setSelectedUnitListId(unitListId);
-                    UnitList.highlight(unitListId);
-
-                    if (player2.getIsAI()) {
-                        UnitList.moveAI(unitListId, grid);
-                    }
-
-                } else {
-
-                    // if player1 and player2 have no units to be moved, progress to next day
-                    this.nextDay();
-
-                    int unitCountPlayer1 = UnitList.getCount(1);
-                    int unitCountPlayer2 = UnitList.getCount(2);
-                    int cityCountPlayer1 = CityList.getCount(1);
-                    int cityCountPlayer2 = CityList.getCount(2);
-
-                    checkforGameOver(unitCountPlayer1, unitCountPlayer2, cityCountPlayer1, cityCountPlayer2);
-
-                }
-
-                // TODO
-                //CityList.updateSelectedCityPanelInformation(getSelectedCityListId());
-            }
-
-            setCurrentPlayerId(-1);
-            setCurrentlyProcessingPlayerTurn(false);
-            
-//           grid.render(p);
-            
-//            Graphics g = p.getGraphics();
-//            g.drawString("Y", 60, 60);
-//            g.dispose();
-            
-//            Graphics2D g = p.canvasImage.createGraphics();
-//        g.setRenderingHints(renderingHints);
-//        g.setColor(this.color);
-//        g.setStroke(stroke);
-//        int n = 0;
-//        g.drawLine(point.x, point.y, point.x+n, point.y+n);
-//        
-
-            /*
-             oPanelMap.show();
-             if (debugShowPlayer2Viewport) {
-             oPanelMapPlayer2.show();
-             }
-
-             //oPanelCityList.show();
-             //oPanelIslandList.show(); 
-             oPanelPlayer1UnitCounts.show();
-             if (debugShowPlayer2Viewport) {
-             oPanelPlayer2UnitCounts.show();
-             }
-             */
+        //logger.entering(getClass().getName(), "doPlayerMove");
+        switch (getGameState()) {
+            case INIT:
+                break;
+            case WAITINGFORUSER:
+                break;
+            case INPROGRESS:
+                /*
+                 // just for testing
+                 System.out.println("in ge doPlayerMove  case INPROGRESS");
+                 if (getCurrentlyProcessingPlayerTurn() == false) {
+                 gui.showDialogueAiSurrender();
+                 setGameState(GameState.WAITINGFORUSER);
+                 }
+                 */
+                processPlayerTurn(grid);
+                break;
+            case ENDED:
+                break;
         }
-
-        logger.exiting(getClass().getName(), "doPlayerMove");
     }
 
-    void nextDay() {
+    private void processPlayerTurn(Grid grid) {
+
+        if (getCurrentlyProcessingPlayerTurn() == false) {
+
+            setCurrentlyProcessingPlayerTurn(true);
+
+            // player1 moves first
+            if (UnitList.hasUnitsWithMovesLeftToday(1)) {
+
+                //logger.fine("GameEngine.doPlayerMove() player1 has units with moves left today");
+                setCurrentPlayerId(1);
+
+                int unitListId = UnitList.getNextUnitWithMovesLeftToday(1);
+                setSelectedUnitListId(unitListId);
+                UnitList.highlight(unitListId);
+
+                UnitList.moveAI(unitListId, grid);
+                
+
+            } else if (UnitList.hasUnitsWithMovesLeftToday(2)) {
+
+                //logger.fine("GameEngine.doPlayerMove() player2 has units with moves left today");
+                setCurrentPlayerId(2);
+
+                int unitListId = UnitList.getNextUnitWithMovesLeftToday(2);
+                setSelectedUnitListId(unitListId);
+                UnitList.highlight(unitListId);
+
+                if (player2.getIsAI()) {
+                    UnitList.moveAI(unitListId, grid);
+                }
+
+            } else {
+
+                if (player1.getIsAI()) {
+                    EndPlayerTurn();
+                }
+
+                if (player2.getIsAI()) {
+                    EndPlayerTurn();
+                } else {
+                    // if player 2 (human) has no units, they should not need to click button to End Turn
+                    if (UnitList.getCount(2) == 0) {
+                        EndPlayerTurn();
+                    } else {
+                        // player2 is human, were are waiting for user to click End Turn button
+                        System.out.println("system waiting for player 2 to click button End Turn");
+                        setGameState(GameState.WAITINGFORUSER);
+                        gui.setEndTurnButtonEnabled(true);
+                    }
+                }
+
+            }
+
+            // TODO
+            //CityList.updateSelectedCityPanelInformation(getSelectedCityListId());
+        }
+
+        setCurrentPlayerId(-1);
+        setCurrentlyProcessingPlayerTurn(false);
+
+        //logger.exiting(getClass().getName(), "doPlayerMove");
+    }
+
+    public void EndPlayerTurn() {
+
+        gui.setEndTurnButtonEnabled(false);
+        
+        // is there a winner?
+        int unitCountPlayer1 = UnitList.getCount(1);
+        int unitCountPlayer2 = UnitList.getCount(2);
+        int cityCountPlayer1 = CityList.getCount(1);
+        int cityCountPlayer2 = CityList.getCount(2);
+
+        checkforGameOver(unitCountPlayer1, unitCountPlayer2, cityCountPlayer1, cityCountPlayer2);
+
+        // player1 and player2 have no units to be moved, progress to next day
+        this.nextDay();
+    }
+
+    private void nextDay() {
 
         //logger.entering(getClass().getName(), "nextDay");
-
         setDayNumber(getDayNumber() + 1);
 
         System.out.println("Day " + getDayNumber());
@@ -409,16 +409,13 @@ public class GameEngine {
         UnitList.resetMovesLeftToday();
         UnitList.resetAttacksLeftToday();
         CityList.manageProduction();
-        //oCityList.Draw();
-        //oViewport.draw(); // TODO
 
         //logger.exiting(getClass().getName(), "nextDay");
     }
 
     void checkforGameOver(int unitCountPlayer1, int unitCountPlayer2, int cityCountPlayer1, int cityCountPlayer2) {
 
-        logger.entering(getClass().getName(), "checkforGameOver");
-
+        //logger.entering(getClass().getName(), "checkforGameOver");
         int minDayNumber = 10;
         int minUnitNumber = 10;
         int minCityNumber = 0;
@@ -429,52 +426,128 @@ public class GameEngine {
             if (unitCountPlayer1 <= minUnitNumber && cityCountPlayer1 <= minCityNumber) {
 
                 if (player1.getIsAI()) {
-                    gameOver(2); // player 2 wins
+                    gameOverPlayAgain(2); // player 2 wins
                 } else {
                     // player1 is HUMAN so show Dialogue Surrender
                     // TODO
                     // oDialogueSurrender.show();
                     // if player1 (HUMAN) surrenders...
-                    gameOver(2); // player 2 wins
+                    gameOverPlayAgain(2); // player 2 wins
                 }
 
             } else if (unitCountPlayer2 <= minUnitNumber && cityCountPlayer2 <= minCityNumber) {
 
                 if (player2.getIsAI()) {
-                    gameOver(1); // player1 wins
+                    gameOverPlayAgain(1); // player1 wins
                 } else {
                     // player2 is HUMAN so show Dialogue Surrender
                     // TODO
                     // oDialogueSurrender.show();
                     // if player2 (HUMAN) surrenders...
-                    gameOver(1); // player 1 wins
+                    gameOverPlayAgain(1); // player 1 wins
                 }
 
             }
 
         }
 
-        logger.exiting(getClass().getName(), "checkforGameOver");
+        //logger.exiting(getClass().getName(), "checkforGameOver");
     }
 
-    void gameOver(int winningPlayerId) {
+    public void userActionPlayerAcceptedSurrenderYes() {
 
-        setGameState(GameState.ENDED);
+        System.out.println("in ge userActionPlayerAcceptedSurrenderYes()");
+        if (getCurrentPlayerId() == 1) {
+            gameOverPlayAgain(2);
+        } else {
+            gameOverPlayAgain(1);
+        }
+    }
 
-        if (player1.getIsAI() && winningPlayerId == 1) {
+    public void userActionPlayerAcceptedSurrenderNo() {
+
+        System.out.println("in ge userActionPlayerAcceptedSurrenderNo()");
+        setGameState(GameState.INPROGRESS);
+    }
+
+    private void gameOverPlayAgain(int winningPlayerId) {
+
+        System.out.println("in ge gameOver(" + winningPlayerId + ")");
+        setGameState(GameState.WAITINGFORUSER);
+        if (player1.getIsAI() && winningPlayerId == 2) {
             System.out.println("");
             System.out.println("General, I surrender.");
             System.out.println("");
+            setGameState(GameState.WAITINGFORUSER);
             gui.showDialogueAiSurrender();
+        } else {
+            gui.showDialogueGameOverPlayAgain();
         }
 
-        System.out.println("Player " + winningPlayerId + " has won!");
+    }
+
+    public void userActionGameOverPlayAgainYes(Grid grid) {
+
+        System.out.println("in ge userActionGameOverPlayAgainYes()");
+
+        //setGameState(GameState.INIT);
+        try {
+            // TODO
+            //init(0, -1);
+            System.out.println("feature not yet implemented: play again");
+            System.exit(0);
+
+        } catch (Exception ex) {
+        }
+
+        //setGameState(GameState.INPROGRESS);
+    }
+
+    public void userActionGameOverPlayAgainNo() {
+
+        System.out.println("in ge userActionGameOverPlayAgainNo()");
+        setGameState(GameState.WAITINGFORUSER);
+        if (getCurrentPlayerId() == 1) {
+            displayThankYouForPlayingDialogue(2);
+        } else {
+            displayThankYouForPlayingDialogue(1);
+        }
+    }
+
+    private void displayThankYouForPlayingDialogue(int winningPlayerId) {
+
+        System.out.println("in ge displayThankYouForPlayingDialogue()");
+        if (winningPlayerId != -1) {
+            System.out.println("Player " + winningPlayerId + " has won!");
+        }
         System.out.println("Thank you for playing StratConClone!");
         System.out.println("");
-        gui.showDialogueGameOver();
+
+        setGameState(GameState.WAITINGFORUSER);
+        gui.showDialogueThanksForPlaying();
 
         //logger.info("Game Over");
     }
+
+    public void userActionQuit() {
+
+        System.out.println("");
+        System.out.println("Bye.");
+        System.out.println("");
+        gui.quit();
+        System.exit(0);
+    }
+
+
+    public void mouseClicked(int screenX, int screenY) {
+        System.out.println("in ge mouseClicked("+screenX+","+screenY+")");
+    }
+        
+    public void mousePressed(int screenX, int screenY) {
+        System.out.println("in ge mousePressed("+screenX+","+screenY+")");
+    }
     
-    
+    public void mouseDragged(int screenX, int screenY) {
+        System.out.println("in ge mouseDragged("+screenX+","+screenY+")");
+    }
 }

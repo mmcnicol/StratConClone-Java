@@ -34,12 +34,13 @@ public class Main {
             isPortCityPlayer1 = gameEngine.assignPlayerStartCity(1, grid);
             isPortCityPlayer2 = gameEngine.assignPlayerStartCity(2, grid);
             
-            gui = new GUI(grid, maximiseGameWindow); // create and display GUI
+            gui = new GUI(grid, gameEngine, maximiseGameWindow); // create and display GUI
             
             gameEngine.setGui(gui);
             
-            // TODO: if HUMAN player2, show select city production dialogue
-            gui.show_dialogue_city_production(isPortCityPlayer2);
+            // if HUMAN player2, show select city production dialogue
+            gui.build_dialogue_city_production(isPortCityPlayer2);
+            gui.showDialogueCityProduction();
 
             gameLoop(); // start the game loop
 

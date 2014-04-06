@@ -19,6 +19,7 @@ import javax.swing.*;
 public class GUI {
 
     Grid grid;
+    GameEngine gameEngine;
 
     int screenWidth;
     int screenHeight;
@@ -44,7 +45,7 @@ public class GUI {
 
     /**
      * **************************
-     * dialogue 1 - human player, set city production
+     * dialogue - human player, set city production
      */
     private JDialog diag_production;
     private JLabel diag_production_label1; // user message
@@ -54,7 +55,7 @@ public class GUI {
 
     /**
      * **************************
-     * dialogue 2 - surrender
+     * dialogue - surrender
      */
     private JDialog diag_surrender;
     private JLabel diag_surrender_label1; // user message (do you accept my surrender?)
@@ -63,22 +64,31 @@ public class GUI {
 
     /**
      * **************************
-     * dialogue 3 - game over
+     * dialogue - game over, play again?
      */
     private JDialog diag_gameover;
     private JLabel diag_gameover_label1; // user message (game over, play again?)
     private JButton btnGameOverYesPlayAgain;
     private JButton btnGameOverNoQuit;
 
+     /**
+     * **************************
+     * dialogue - bye, thanks for playing
+     */
+    private JDialog diag_bye;
+    private JLabel diag_bye_label1;
+    private JButton btnBye;
+    
     // constructor
-    public GUI(Grid g, boolean maximiseGameWindow) {
-        
-        grid = g;
-        this.maximiseGameWindow = maximiseGameWindow;
+    public GUI(Grid _grid, GameEngine _gameEngine, boolean _maximiseGameWindow) {
+
+        grid = _grid;
+        gameEngine = _gameEngine;
+        this.maximiseGameWindow = _maximiseGameWindow;
 
         GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
         //GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        
+
         GraphicsDevice gd = ge.getDefaultScreenDevice();
         GraphicsConfiguration gc = gd.getDefaultConfiguration();
         Insets ins = Toolkit.getDefaultToolkit().getScreenInsets(gc);
@@ -102,14 +112,30 @@ public class GUI {
         return p1;
     }
 
+    public void showDialogueCityProduction() {
+        System.out.println("in gui showDialogueCityProduction()");
+        diag_production.setVisible(true);
+    }
+    
+    public void setEndTurnButtonEnabled(boolean value) {
+        btnEndTurn2.setEnabled(value);
+    }
+        
     public void showDialogueAiSurrender() {
+        System.out.println("in gui showDialogueAiSurrender()");
         diag_surrender.setVisible(true);
     }
 
-    public void showDialogueGameOver() {
-        diag_gameover.setVisible(false);
+    public void showDialogueGameOverPlayAgain() {
+        System.out.println("in gui showDialogueGameOverPlayAgain()");
+        diag_gameover.setVisible(true);
     }
-        
+
+    public void showDialogueThanksForPlaying() {
+        System.out.println("in gui showDialogueThanksForPlaying()");
+        diag_bye.setVisible(true);
+    }
+    
     public void updateDayNumberLabel(int dayNumber) {
         label__game_day_number.setText(" Day " + Integer.toString(dayNumber) + " ");
     }
@@ -117,11 +143,17 @@ public class GUI {
     private void createAndShowGUI() {
 
         build_frame1();
-        //build_dialogue1_city_production();
+        //build_dialogue_city_production();
         build_dialogue_AI_surrender();
         build_dialogue_game_over();
+        build_dialogue_bye();
     }
 
+    public void quit() {
+
+        System.exit(0);
+    }
+        
     /**
      * ****************************************
      * frame 1 - game window
@@ -133,29 +165,39 @@ public class GUI {
         f1 = new JFrame("Strategic Conquest Clone");
         f1.setResizable(false);
 
-        
         //2. Optional: What happens when the frame closes?
         //f1.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         f1.addWindowListener(closeWindow);
 
         //3. Create components and put them in the frame.
         //...create emptyLabel...
-        p1 = new JPanel();        
-
-        p1.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent e) {
-                if (e.getButton() == MouseEvent.BUTTON1) {
-                    // TODO   moveSquare(e.getX(),e.getY());
-                }
-            }
-        });
+        p1 = new JPanel();
 
         p1.addMouseMotionListener(new MouseAdapter() {
             @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) {
+                    if( gameEngine.getCurrentPlayerId()==2) {
+                        gameEngine.mouseClicked(e.getX(),e.getY());
+                    }
+                }
+            }
+            
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (e.getButton() == MouseEvent.BUTTON1) {
+                    if( gameEngine.getCurrentPlayerId()==2) {
+                        gameEngine.mousePressed(e.getX(),e.getY());
+                    }
+                }
+            }
+
+            @Override
             public void mouseDragged(MouseEvent e) {
                 if (e.getButton() == MouseEvent.BUTTON1) {
-                    // TODO   moveSquare(e.getX(),e.getY());
+                    if( gameEngine.getCurrentPlayerId()==2) {
+                        gameEngine.mouseDragged(e.getX(),e.getY());
+                    }
                 }
             }
         });
@@ -168,7 +210,7 @@ public class GUI {
             f1.setBounds((screenWidth / 2) - 250, (screenHeight / 2) - 250, 500, 500); // (int x, int y, int width, int height)
             p1.setPreferredSize(new Dimension(500, 500)); // width, height
         }
-        
+
 //        hbar = new JScrollBar(JScrollBar.HORIZONTAL, 30, 20, 0, 300); // value, extent, min, max
 //        vbar = new JScrollBar(JScrollBar.VERTICAL, 30, 40, 0, 300); // value, extent, min, max
 //        hbar = new JScrollBar(JScrollBar.HORIZONTAL, 0, grid.getCols()/10, 0, grid.getCols()); // value, extent, min, max
@@ -235,6 +277,7 @@ public class GUI {
         // items for menu ONE
         menu1_item1 = new JMenuItem("one-one", KeyEvent.VK_B);
         menu1_item1.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 System.out.println("menu bar; menu1; item1...clicked");
             }
@@ -258,9 +301,12 @@ public class GUI {
 
         //Build the menuEndTurn
         btnEndTurn2 = new JButton("End Turn");
+        btnEndTurn2.setEnabled(false);
         btnEndTurn2.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 System.out.println("menu bar; Button menuEndTurn2...clicked");
+                gameEngine.EndPlayerTurn();
             }
         });
         menuBar.add(btnEndTurn2);
@@ -285,6 +331,7 @@ public class GUI {
         btnEndTurn1 = new JButton();
         btnEndTurn1.setText("End Turn");
         btnEndTurn1.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 System.out.println("tool bar; btnEndTurn1...clicked");
             }
@@ -298,7 +345,7 @@ public class GUI {
      * dialogue 1 - human player, set city production
      *
      */
-    public void show_dialogue_city_production(boolean isPortCity) {
+    public void build_dialogue_city_production(boolean isPortCity) {
 
         //1. Create the dialogue (referencing the parent frame).
         diag_production = new JDialog(f1, "Select City Production", true);
@@ -394,7 +441,7 @@ public class GUI {
         diag_production.pack();
 
         //5. Show it.
-        diag_production.setVisible(true);
+        diag_production.setVisible(false);
     }
 
     /**
@@ -419,20 +466,25 @@ public class GUI {
         //diag_production.add(p1, BorderLayout.CENTER);
         btnSurrenderYes = new JButton("Yes");
         btnSurrenderYes.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
-                System.out.println("Accept My Surrender; Button Yes...clicked");
+                System.out.println("Accept My Surrender; Button Yes...clicked ");
                 diag_surrender.setVisible(false);
+                gameEngine.userActionPlayerAcceptedSurrenderYes();
             }
         });
+
         //diag_surrender.add(btnSurrenderYes, BorderLayout.SOUTH);
         btnSurrenderYes.setHorizontalAlignment(SwingConstants.CENTER);
         diag_surrender.add(btnSurrenderYes, BorderLayout.SOUTH);
 
         btnSurrenderNo = new JButton("No");
         btnSurrenderNo.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 System.out.println("Accept My Surrender; Button No...clicked");
                 diag_surrender.setVisible(false);
+                gameEngine.userActionPlayerAcceptedSurrenderNo();
             }
         });
         //diag_surrender.add(btnSurrenderNo, BorderLayout.SOUTH);
@@ -460,7 +512,7 @@ public class GUI {
 
     /**
      * ****************************************
-     * dialogue 3 - game over
+     * dialogue - game over, play again?
      *
      */
     public void build_dialogue_game_over() {
@@ -480,9 +532,11 @@ public class GUI {
         //diag_production.add(p1, BorderLayout.CENTER);
         btnGameOverYesPlayAgain = new JButton("Yes");
         btnGameOverYesPlayAgain.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 System.out.println("GameOver; Button Yes (Play Again)...clicked");
                 diag_gameover.setVisible(false);
+                gameEngine.userActionGameOverPlayAgainYes(grid);
             }
         });
         btnGameOverYesPlayAgain.setHorizontalAlignment(SwingConstants.CENTER);
@@ -490,9 +544,11 @@ public class GUI {
 
         btnGameOverNoQuit = new JButton("No");
         btnGameOverNoQuit.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 System.out.println("GameOver; Button No (Quit)...clicked");
                 diag_gameover.setVisible(false);
+                gameEngine.userActionGameOverPlayAgainNo();
             }
         });
         btnGameOverNoQuit.setHorizontalAlignment(SwingConstants.CENTER);
@@ -515,6 +571,58 @@ public class GUI {
 
         //5. Show it.
         diag_gameover.setVisible(false);
+    }
+
+    
+    /**
+     * ****************************************
+     * dialogue - bye, thanks for playing
+     *
+     */
+    public void build_dialogue_bye() {
+
+        //1. Create the dialogue (referencing the parent frame).
+        diag_bye = new JDialog(f1, "", true);
+        //diag_gameover.setBounds(200, 200, 400, 200);
+        diag_bye.setBounds((screenWidth / 2) - 200, (screenHeight / 2) - 100, 400, 200);
+        diag_bye.setPreferredSize(new Dimension(400, 200)); // width, height
+
+        //2. Optional: What happens when the dialogue closes?
+        //f1.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        diag_bye.addWindowListener(closeWindow);
+
+        //3. Create components and put them in the frame.
+        //...create emptyLabel...
+        //diag_production.add(p1, BorderLayout.CENTER);
+        btnBye = new JButton("Quit");
+        btnBye.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                System.out.println("Bye; Button Quit...clicked");
+                diag_bye.setVisible(false);
+                gameEngine.userActionQuit();
+            }
+        });
+        btnBye.setHorizontalAlignment(SwingConstants.CENTER);
+        diag_bye.add(btnBye, BorderLayout.SOUTH);
+
+       
+        Container diag_bye_content_pane = diag_bye.getContentPane();
+        diag_bye_content_pane.setLayout(new BorderLayout());
+        JPanel diag_bye_pane = new JPanel();
+        diag_bye_pane.setLayout(new FlowLayout());
+        diag_bye_pane.add(btnBye);
+        diag_bye_content_pane.add(diag_bye_pane, BorderLayout.SOUTH);
+
+        diag_bye_label1 = new JLabel("Thank you for playing!");
+        diag_bye_label1.setHorizontalAlignment(SwingConstants.CENTER);
+        diag_bye_content_pane.add(diag_bye_label1, BorderLayout.CENTER);
+
+        //4. Size the frame.
+        diag_bye.pack();
+
+        //5. Show it.
+        diag_bye.setVisible(false);
     }
 
 }
